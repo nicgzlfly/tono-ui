@@ -17,7 +17,7 @@
  * 调试模式：浏览器里没有 window.tono 时，用 mock 让 UI 单独可调。
  */
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 document.getElementById('ver').textContent = VERSION;
 
 // -------- bridge wrapper --------
@@ -120,6 +120,14 @@ function showSettings() {
 }
 
 $settings.addEventListener('click', () => bridge.openSettings ? bridge.openSettings() : showSettings());
+
+document.getElementById('export-btn').addEventListener('click', () => {
+  if (bridge.exportLastSession) {
+    bridge.exportLastSession();
+  } else {
+    setStatus('mock 模式无日志', 'err');
+  }
+});
 
 document.getElementById('save-btn').addEventListener('click', () => {
   const key = $apiKey.value.trim();
