@@ -1,39 +1,48 @@
 /**
- * Tono UI v0.3.0 — 持续监听 + VAD 切句模式 + 听语状态条
+ * Tono UI v0.4.0 — 同传 + 学习双模式
  *
  * 原生 → JS:
  *   onSessionStarted / onSessionStopped / onSessionFailed / onError / onApiKeyMissing
- *   onUtterance({ id, src?, tgt?, status, latencyMs? })
- *   onVadState({ state: 'speech' | 'silence' })
+ *   onUtterance({ id, src?, tgt?, status, latencyMs?, speaker?: 'ME'|'OTHER'|'UNSURE', lang?: 'zh'|'en' })
+ *   onPolished({ id, polished })   ← 学习模式 LLM 异步返回
+ *   onVadState({ state })
  *
- * JS → 原生 (window.tono.*):
- *   startSession / stopSession / openSettings
+ * JS → 原生:
+ *   startSession / stopSession / openSettings / openCalibration / openReview
  *   getApiKey / saveApiKey
  *   exportLastSession / listLogs
- *   setSegmentMode(mode) / getSegmentMode()
+ *   setSegmentMode / getSegmentMode
+ *   setProductMode / getProductMode
+ *   getTranslateMyVoice / setTranslateMyVoice
+ *   saveFavorite(json)
  */
 
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 document.getElementById('ver').textContent = VERSION;
 
 // -------- bridge wrapper（含 mock）--------
-const bridge = window.tono || (() => {
-  return {
-    startSession() { console.log('[mock] startSession'); setTimeout(() => window.onSessionStarted?.(), 200); },
-    stopSession() { console.log('[mock] stopSession'); setTimeout(() => window.onSessionStopped?.(), 100); },
-    openSettings() { console.log('[mock] openSettings'); },
-    exportLastSession() { console.log('[mock] export'); },
-    getApiKey() { return localStorage.getItem('mock_api_key') || ''; },
-    saveApiKey(k) { localStorage.setItem('mock_api_key', k); },
-    setSegmentMode(m) { console.log('[mock] setSegmentMode', m); localStorage.setItem('mock_mode', m); },
-    getSegmentMode() { return localStorage.getItem('mock_mode') || 'NATURAL'; },
-  };
-})();
+const bridge = window.tono || (() => ({
+  startSession() { console.log('[mock] startSession'); setTimeout(() => window.onSessionStarted?.(), 200); },
+  stopSession() { setTimeout(() => window.onSessionStopped?.(), 100); },
+  openSettings() {},
+  openCalibration() { alert('mock: 打开校准页'); },
+  openReview() { alert('mock: 打开语料本'); },
+  exportLastSession() {},
+  getApiKey() { return localStorage.getItem('mock_api_key') || ''; },
+  saveApiKey(k) { localStorage.setItem('mock_api_key', k); },
+  setSegmentMode(m) { localStorage.setItem('mock_seg', m); },
+  getSegmentMode() { return localStorage.getItem('mock_seg') || 'NATURAL'; },
+  setProductMode(m) { localStorage.setItem('mock_pmode', m); },
+  getProductMode() { return localStorage.getItem('mock_pmode') || 'translate'; },
+  saveFavorite(j) { console.log('[mock] saveFavorite', j); },
+}))();
 
 // -------- state --------
 const state = {
   recording: false,
+  mode: bridge.getProductMode?.() || 'translate',
   utterances: new Map(),
+  favoriteSet: new Set(),
 };
 const $status = document.getElementById('status');
 const $utts = document.getElementById('utterances');
@@ -48,15 +57,20 @@ function setStatus(text, cls) {
   $status.textContent = text;
   $status.className = 'status' + (cls ? ' ' + cls : '');
 }
-
 function setVad(label, cls) {
   $vadState.textContent = label;
   $vadState.className = 'vad-state ' + (cls || '');
 }
+function applyMode(m) {
+  state.mode = m;
+  document.body.dataset.mode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+  bridge.setProductMode?.(m);
+}
 
-// -------- 原生 → JS 钩子 --------
+// -------- 原生 → JS --------
 window.onSessionStarted = () => {
-  setStatus('监听中', 'on');
+  setStatus(state.mode === 'learn' ? '学习中' : '同传中', 'on');
   setVad('校准噪音…', 'calibrating');
   $rec.classList.add('active');
   $recLabel.textContent = '点击停止';
@@ -79,15 +93,8 @@ window.onSessionFailed = (e) => {
   state.recording = false;
 };
 
-window.onError = (e) => {
-  const msg = e?.msg || e || '未知';
-  setStatus(`错误: ${msg}`, 'err');
-};
-
-window.onApiKeyMissing = () => {
-  setStatus('需要 API Key', 'err');
-  showSettings();
-};
+window.onError = (e) => setStatus(`错误: ${e?.msg || e}`, 'err');
+window.onApiKeyMissing = () => { setStatus('需要 API Key', 'err'); bridge.openSettings?.(); };
 
 window.onVadState = (e) => {
   const s = e?.state || e;
@@ -101,19 +108,62 @@ window.onUtterance = (u) => {
   if (!node) {
     node = document.createElement('div');
     node.className = 'utt partial';
-    node.innerHTML = '<div class="src"></div><div class="tgt"></div><div class="meta"></div>';
+    node.dataset.id = u.id;
+    node.innerHTML = `
+      <div class="src"></div>
+      <div class="tgt"></div>
+      <div class="polished" style="display:none"></div>
+      <div class="meta"></div>
+    `;
     $utts.appendChild(node);
     state.utterances.set(u.id, node);
     requestAnimationFrame(() => node.scrollIntoView({ behavior: 'smooth', block: 'end' }));
   }
   if (u.src !== undefined) node.querySelector('.src').textContent = u.src;
   if (u.tgt !== undefined) node.querySelector('.tgt').textContent = u.tgt;
+
+  // speaker class
+  if (u.speaker === 'ME') node.classList.add('me');
+  else if (u.speaker === 'OTHER') node.classList.add('other');
+  node.dataset.speaker = u.speaker || '';
+  node.dataset.lang = u.lang || '';
+
   if (u.status === 'final') {
     node.classList.remove('partial');
-    if (u.latencyMs != null) {
-      node.querySelector('.meta').textContent = `延迟 ${u.latencyMs}ms`;
+    const meta = node.querySelector('.meta');
+    const parts = [];
+    if (u.latencyMs != null) parts.push(`延迟 ${u.latencyMs}ms`);
+    if (u.speaker) parts.push(`说话人:${u.speaker === 'ME' ? '我' : u.speaker === 'OTHER' ? '对方' : '未知'}`);
+    meta.textContent = parts.join(' · ');
+
+    // 学习模式 + me 段：加收藏按钮
+    if (state.mode === 'learn' && u.speaker === 'ME' && !node.querySelector('.fav-btn')) {
+      const btn = document.createElement('button');
+      btn.className = 'fav-btn';
+      btn.textContent = '💾 收藏';
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const item = {
+          src: node.querySelector('.src').textContent,
+          tgt: node.querySelector('.tgt').textContent,
+          polished: node.querySelector('.polished').textContent || '',
+          speaker: 'ME',
+        };
+        bridge.saveFavorite?.(JSON.stringify(item));
+        btn.classList.add('saved');
+        btn.textContent = '✓ 已收藏';
+      });
+      meta.appendChild(btn);
     }
   }
+};
+
+window.onPolished = (e) => {
+  const node = state.utterances.get(e?.id);
+  if (!node || !e?.polished) return;
+  const p = node.querySelector('.polished');
+  p.textContent = '🎯 ' + e.polished;
+  p.style.display = 'block';
 };
 
 // -------- 录音按钮（持续模式：点击切换）--------
@@ -130,38 +180,44 @@ function toggleRec() {
 }
 $rec.addEventListener('click', toggleRec);
 
-// -------- 切句模式 --------
-const $pills = document.querySelectorAll('.pill');
-$pills.forEach(p => p.addEventListener('click', () => {
-  const mode = p.dataset.mode;
-  bridge.setSegmentMode(mode);
-  $pills.forEach(x => x.classList.toggle('active', x === p));
+// -------- 模式 toggle --------
+document.querySelectorAll('.mode-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    if (state.recording) {
+      setStatus('停止后才能切换模式', 'err');
+      return;
+    }
+    applyMode(b.dataset.mode);
+    setStatus(b.dataset.mode === 'learn' ? '学习模式' : '同传模式');
+  });
+});
+applyMode(state.mode);
+
+// -------- 切句模式 pills --------
+document.querySelectorAll('.pill').forEach(p => p.addEventListener('click', () => {
+  const mode = p.dataset.segmode;
+  bridge.setSegmentMode?.(mode);
+  document.querySelectorAll('.pill').forEach(x => x.classList.toggle('active', x === p));
 }));
+const currentSeg = bridge.getSegmentMode?.() || 'NATURAL';
+document.querySelectorAll('.pill').forEach(x => x.classList.toggle('active', x.dataset.segmode === currentSeg));
 
-// 启动时同步 mode
-const currentMode = bridge.getSegmentMode?.() || 'NATURAL';
-$pills.forEach(x => x.classList.toggle('active', x.dataset.mode === currentMode));
-
-// -------- 设置 --------
-function showSettings() {
-  $apiKey.value = bridge.getApiKey?.() || '';
-  if (typeof $dialog.showModal === 'function') $dialog.showModal();
-  else $dialog.setAttribute('open', '');
-}
-
+// -------- 设置 / 导出 --------
 $settings.addEventListener('click', () => bridge.openSettings ? bridge.openSettings() : showSettings());
-
 document.getElementById('export-btn').addEventListener('click', () => {
   if (bridge.exportLastSession) bridge.exportLastSession();
   else setStatus('mock 模式无日志', 'err');
 });
 
+function showSettings() {
+  $apiKey.value = bridge.getApiKey?.() || '';
+  $dialog.showModal?.();
+}
 document.getElementById('save-btn').addEventListener('click', () => {
-  const key = $apiKey.value.trim();
-  if (!key) return;
-  bridge.saveApiKey?.(key);
+  const k = $apiKey.value.trim();
+  if (!k) return;
+  bridge.saveApiKey?.(k);
   $dialog.close();
-  setStatus('已保存 API Key');
 });
 document.getElementById('cancel-btn').addEventListener('click', () => $dialog.close());
 

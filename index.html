@@ -3,16 +3,23 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover" />
-<title>Tono · 同声传译</title>
+<title>Tono · 同传 + 学习</title>
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header>
     <span class="brand">Tono</span>
-    <span id="status" class="status">未连接</span>
+    <div class="mode-toggle">
+      <button class="mode-btn active" data-mode="translate">同传</button>
+      <button class="mode-btn" data-mode="learn">学习</button>
+    </div>
     <button id="export-btn" class="icon-btn" title="导出上次日志">📋</button>
     <button id="settings-btn" class="icon-btn" title="设置">⚙</button>
   </header>
+
+  <div class="status-bar">
+    <span id="status" class="status">未连接</span>
+  </div>
 
   <main>
     <section class="transcript">
@@ -23,17 +30,17 @@
   <footer>
     <div class="vad-bar">
       <span class="vad-state" id="vad-state">待机</span>
-      <div class="mode-pills">
-        <button class="pill" data-mode="FLUENT">流畅 250ms</button>
-        <button class="pill active" data-mode="NATURAL">自然 600ms</button>
-        <button class="pill" data-mode="LECTURE">演讲 1.5s</button>
+      <div class="seg-pills">
+        <button class="pill" data-segmode="FLUENT">流畅</button>
+        <button class="pill active" data-segmode="NATURAL">自然</button>
+        <button class="pill" data-segmode="LECTURE">演讲</button>
       </div>
     </div>
     <button id="rec-btn" class="rec">
       <span class="rec-dot"></span>
       <span class="rec-label">点击开始</span>
     </button>
-    <p class="hint" id="hint">点一下开始持续监听 · 再点一下停止 · UI 版本 <span id="ver"></span></p>
+    <p class="hint" id="hint">UI <span id="ver"></span></p>
   </footer>
 
   <dialog id="settings-dialog">
