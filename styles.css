@@ -79,30 +79,50 @@ main {
 .utt .fav-btn.saved { color: var(--polished); border-color: var(--polished); }
 .utt.partial { opacity: 0.7; }
 
-/* 学习模式 - me 段（高亮）*/
-.utt.me {
-  border-left-color: var(--me);
-  background: rgba(108, 226, 108, 0.06);
+/* head 标签 (speaker · 语向) */
+.utt .head {
+  font-size: 11px; color: var(--dim);
+  margin-bottom: 6px; letter-spacing: 0.5px;
 }
-.utt.me .src::before { content: "🎤 我说："; opacity: 0.7; margin-right: 4px; }
-.utt.me .tgt::before { content: "✨ 这样说："; opacity: 0.7; margin-right: 4px; }
 
-/* 学习模式 - other 段（折叠次要）*/
-.utt.other {
+/* LLM 失败提示 */
+.utt .llm-status {
+  font-size: 12px; color: var(--accent);
+  margin-top: 4px;
+}
+
+/* === 学习模式 4 组合 === */
+/* 我说中文 — 主学习卡片（绿）*/
+body[data-mode="learn"] .utt.combo-me-zh {
+  border-left-color: var(--me);
+  background: rgba(108, 226, 108, 0.08);
+}
+/* 对方说中文 — 也学习（蓝）*/
+body[data-mode="learn"] .utt.combo-other-zh {
+  border-left-color: var(--src);
+  background: rgba(136, 192, 255, 0.06);
+}
+/* 我说英文 — 验证练习（紫）*/
+body[data-mode="learn"] .utt.combo-me-en {
+  border-left-color: var(--polished);
+  background: rgba(184, 141, 255, 0.05);
+}
+/* 对方说英文 — 翻译次要（灰折叠）*/
+body[data-mode="learn"] .utt.combo-other-en {
   opacity: 0.7;
   font-size: 14px;
   padding: 10px 14px;
 }
-.utt.other .src::before { content: "🗣 对方："; opacity: 0.7; margin-right: 4px; }
 
-/* 同传模式不区分 me/other 视觉，去掉装饰 */
-body[data-mode="translate"] .utt.me::before,
-body[data-mode="translate"] .utt.other::before { content: ""; }
-body[data-mode="translate"] .utt.me { border-left-color: transparent; background: var(--card); }
-body[data-mode="translate"] .utt.other { opacity: 1; font-size: 16px; padding: 12px 14px; }
-body[data-mode="translate"] .utt.me .src::before,
-body[data-mode="translate"] .utt.me .tgt::before,
-body[data-mode="translate"] .utt.other .src::before { content: ""; }
+/* === 同传模式 me/other === */
+body[data-mode="translate"] .utt.me {
+  border-left-color: var(--me);
+  background: rgba(108, 226, 108, 0.04);
+}
+body[data-mode="translate"] .utt.other {
+  /* 同传 other 是默认翻译目标，强化展示 */
+  background: var(--card);
+}
 
 @keyframes slide-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
 

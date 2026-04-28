@@ -17,7 +17,7 @@
  *   saveFavorite(json)
  */
 
-const VERSION = '0.5.1';
+const VERSION = '0.6.0';
 document.getElementById('ver').textContent = VERSION;
 
 // -------- bridge wrapper（含 mock）--------
@@ -123,16 +123,16 @@ window.onUtterance = (u) => {
     node.className = 'utt partial';
     node.dataset.id = u.id;
     node.innerHTML = `
+      <div class="head"></div>
       <div class="src"></div>
       <div class="tgt"></div>
       <div class="polished" style="display:none"></div>
+      <div class="llm-status" style="display:none"></div>
       <div class="meta"></div>
     `;
-    // v0.5.0：最新卡片插到最上
     if ($utts.firstChild) $utts.insertBefore(node, $utts.firstChild);
     else $utts.appendChild(node);
     state.utterances.set(u.id, node);
-    // 滚到顶部展示新卡
     requestAnimationFrame(() => {
       const main = document.querySelector('main');
       if (main) main.scrollTop = 0;
@@ -141,22 +141,36 @@ window.onUtterance = (u) => {
   if (u.src !== undefined) node.querySelector('.src').textContent = u.src;
   if (u.tgt !== undefined) node.querySelector('.tgt').textContent = u.tgt;
 
-  // speaker class
-  if (u.speaker === 'ME') node.classList.add('me');
-  else if (u.speaker === 'OTHER') node.classList.add('other');
+  // speaker × 语向 = 4 组合
   node.dataset.speaker = u.speaker || '';
   node.dataset.lang = u.lang || '';
+  // v0.6.0：在 head 显示 speaker + 语向 双标签
+  const head = node.querySelector('.head');
+  if (head && (u.speaker || u.lang)) {
+    const speakerTag = u.speaker === 'ME' ? '🎤 我'
+      : u.speaker === 'OTHER' ? '🗣 对方' : '? 未知';
+    const langTag = u.lang === 'zh' ? '🇨🇳 中文'
+      : u.lang === 'en' ? '🇬🇧 英文' : '';
+    head.textContent = `${speakerTag} · ${langTag}`;
+  }
+
+  // 卡片视觉分类（学习模式按 4 组合，同传模式仅 me/other）
+  node.classList.remove('me','other','combo-me-zh','combo-other-zh','combo-me-en','combo-other-en');
+  if (u.speaker === 'ME') node.classList.add('me');
+  else if (u.speaker === 'OTHER') node.classList.add('other');
+  if (state.mode === 'learn') {
+    node.classList.add(`combo-${(u.speaker||'unknown').toLowerCase()}-${(u.lang||'unknown').toLowerCase()}`);
+  }
 
   if (u.status === 'final') {
     node.classList.remove('partial');
     const meta = node.querySelector('.meta');
     const parts = [];
     if (u.latencyMs != null) parts.push(`延迟 ${u.latencyMs}ms`);
-    if (u.speaker) parts.push(`说话人:${u.speaker === 'ME' ? '我' : u.speaker === 'OTHER' ? '对方' : '未知'}`);
     meta.textContent = parts.join(' · ');
 
-    // 学习模式 + me 段：加收藏按钮
-    if (state.mode === 'learn' && u.speaker === 'ME' && !node.querySelector('.fav-btn')) {
+    // 学习模式 + 任何中文段：加收藏按钮（v0.6.0 解耦 speaker）
+    if (state.mode === 'learn' && u.lang === 'zh' && !node.querySelector('.fav-btn')) {
       const btn = document.createElement('button');
       btn.className = 'fav-btn';
       btn.textContent = '💾 收藏';
@@ -166,7 +180,7 @@ window.onUtterance = (u) => {
           src: node.querySelector('.src').textContent,
           tgt: node.querySelector('.tgt').textContent,
           polished: node.querySelector('.polished').textContent || '',
-          speaker: 'ME',
+          speaker: u.speaker, lang: u.lang,
         };
         bridge.saveFavorite?.(JSON.stringify(item));
         btn.classList.add('saved');
@@ -175,6 +189,23 @@ window.onUtterance = (u) => {
       meta.appendChild(btn);
     }
   }
+};
+
+// v0.6.0：LLM 失败诊断
+window.onLlmFailed = (e) => {
+  const node = state.utterances.get(e?.id);
+  if (!node) return;
+  const status = node.querySelector('.llm-status');
+  status.textContent = `🚫 LLM 失败：${e.reason || '未知'} ${e.http_code > 0 ? '(HTTP '+e.http_code+')' : ''}`;
+  status.style.display = 'block';
+};
+
+// v0.6.0：通话模式外放给对方提示
+window.onOpponentSpeakerStart = () => {
+  setStatus('📢 已切外放给对方听 — 请拿下耳机', 'err');
+};
+window.onOpponentSpeakerEnd = (e) => {
+  setStatus(`✓ 外放完成 (${e?.total_ms||0}ms)，可重新戴耳机`, 'on');
 };
 
 window.onPolished = (e) => {

@@ -1,5 +1,5 @@
 {
-  "ui_version": "0.5.1",
-  "min_apk_version": 7,
-  "release_notes": "v0.5.1 hotfix — 模式切换清空卡片 + 说话人识别策略可选（OFF/RMS/SPECTRAL/LANGUAGE）+ 阈值放宽"
+  "ui_version": "0.6.0",
+  "min_apk_version": 8,
+  "release_notes": "v0.6.0 — 学习模式 LLM 触发改语向 + LLM 失败诊断 + 通话模式外放给对方 + 学习模式 4 组合卡片"
 }
