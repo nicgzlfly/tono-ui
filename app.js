@@ -17,7 +17,7 @@
  *   saveFavorite(json)
  */
 
-const VERSION = '0.5.0';
+const VERSION = '0.5.1';
 document.getElementById('ver').textContent = VERSION;
 
 // -------- bridge wrapper（含 mock）--------
@@ -206,8 +206,12 @@ document.querySelectorAll('.mode-btn').forEach(b => {
       setStatus('停止后才能切换模式', 'err');
       return;
     }
+    if (state.mode === b.dataset.mode) return;
+    // v0.5.1: 切换模式时清空卡片，避免新旧模式视觉混杂
+    $utts.innerHTML = '';
+    state.utterances.clear();
     applyMode(b.dataset.mode);
-    setStatus(b.dataset.mode === 'learn' ? '学习模式' : '同传模式');
+    setStatus(b.dataset.mode === 'learn' ? '已切到学习模式' : '已切到同传模式');
   });
 });
 applyMode(state.mode);
