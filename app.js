@@ -17,7 +17,7 @@
  *   saveFavorite(json)
  */
 
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 document.getElementById('ver').textContent = VERSION;
 
 // -------- bridge wrapper（含 mock）--------
@@ -94,6 +94,19 @@ window.onSessionFailed = (e) => {
 };
 
 window.onError = (e) => setStatus(`错误: ${e?.msg || e}`, 'err');
+
+window.onIdleHint = () => {
+  setStatus('未检测到说话 — 请大点声或靠近麦克风', 'err');
+};
+window.onIdleAutoStop = () => {
+  setStatus('30 秒无声音，已自动停止', 'err');
+};
+window.onTtsBacklog = (e) => {
+  const ms = e?.pending_ms || 0;
+  const speed = e?.speed || 1.0;
+  if (speed > 1.0) setStatus(`译音排队 ${(ms/1000).toFixed(1)}s · ${speed}x 加速`, 'err');
+  else if (ms > 1000) setStatus(`译音排队 ${(ms/1000).toFixed(1)}s`, '');
+};
 window.onApiKeyMissing = () => { setStatus('需要 API Key', 'err'); bridge.openSettings?.(); };
 
 window.onVadState = (e) => {
@@ -115,9 +128,15 @@ window.onUtterance = (u) => {
       <div class="polished" style="display:none"></div>
       <div class="meta"></div>
     `;
-    $utts.appendChild(node);
+    // v0.5.0：最新卡片插到最上
+    if ($utts.firstChild) $utts.insertBefore(node, $utts.firstChild);
+    else $utts.appendChild(node);
     state.utterances.set(u.id, node);
-    requestAnimationFrame(() => node.scrollIntoView({ behavior: 'smooth', block: 'end' }));
+    // 滚到顶部展示新卡
+    requestAnimationFrame(() => {
+      const main = document.querySelector('main');
+      if (main) main.scrollTop = 0;
+    });
   }
   if (u.src !== undefined) node.querySelector('.src').textContent = u.src;
   if (u.tgt !== undefined) node.querySelector('.tgt').textContent = u.tgt;

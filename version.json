@@ -1,5 +1,5 @@
 {
-  "ui_version": "0.4.0",
-  "min_apk_version": 5,
-  "release_notes": "v0.4.0 — 同传/学习双模式 + 说话人识别 + LLM 更地道说法 + 5 秒声音校准 + 收藏复习页"
+  "ui_version": "0.5.0",
+  "min_apk_version": 6,
+  "release_notes": "v0.5.0 — 修导出 bug + 卡片最新在最上 + TTS 排队监控自动加速 + 频谱特征增强说话人识别 + 静音超时提示"
 }
