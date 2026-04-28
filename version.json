@@ -1,5 +1,5 @@
 {
-  "ui_version": "0.6.0",
-  "min_apk_version": 8,
-  "release_notes": "v0.6.0 — 学习模式 LLM 触发改语向 + LLM 失败诊断 + 通话模式外放给对方 + 学习模式 4 组合卡片"
+  "ui_version": "0.6.1",
+  "min_apk_version": 9,
+  "release_notes": "v0.6.1 — 方舟双 key 体系（同传/LLM 独立）+ LLM prompt 优化加 few-shot 示例"
 }

@@ -17,7 +17,7 @@
  *   saveFavorite(json)
  */
 
-const VERSION = '0.6.0';
+const VERSION = '0.6.1';
 document.getElementById('ver').textContent = VERSION;
 
 // -------- bridge wrapper（含 mock）--------
