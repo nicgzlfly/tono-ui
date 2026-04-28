@@ -21,11 +21,19 @@
   </main>
 
   <footer>
+    <div class="vad-bar">
+      <span class="vad-state" id="vad-state">待机</span>
+      <div class="mode-pills">
+        <button class="pill" data-mode="FLUENT">流畅 250ms</button>
+        <button class="pill active" data-mode="NATURAL">自然 600ms</button>
+        <button class="pill" data-mode="LECTURE">演讲 1.5s</button>
+      </div>
+    </div>
     <button id="rec-btn" class="rec">
       <span class="rec-dot"></span>
-      <span class="rec-label">按住说话</span>
+      <span class="rec-label">点击开始</span>
     </button>
-    <p class="hint" id="hint">长按设置图标可改 API Key · UI 版本 <span id="ver"></span></p>
+    <p class="hint" id="hint">点一下开始持续监听 · 再点一下停止 · UI 版本 <span id="ver"></span></p>
   </footer>
 
   <dialog id="settings-dialog">

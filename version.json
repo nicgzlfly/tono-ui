@@ -1,5 +1,5 @@
 {
-  "ui_version": "0.2.0",
-  "min_apk_version": 2,
-  "release_notes": "v0.2.0 — 加日志功能：每次 session 写 input.wav / output.wav / frames.csv / session.json，📋 按钮一键分享 zip"
+  "ui_version": "0.3.0",
+  "min_apk_version": 4,
+  "release_notes": "v0.3.0 — 持续监听模式 + 客户端 VAD 切句 + 听语状态条；按一下进入持续翻译，停顿即提交"
 }
