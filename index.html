@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>Tono · 同声传译</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <span class="brand">Tono</span>
+    <span id="status" class="status">未连接</span>
+    <button id="settings-btn" class="icon-btn" title="设置">⚙</button>
+  </header>
+
+  <main>
+    <section class="transcript">
+      <div id="utterances"></div>
+    </section>
+  </main>
+
+  <footer>
+    <button id="rec-btn" class="rec">
+      <span class="rec-dot"></span>
+      <span class="rec-label">按住说话</span>
+    </button>
+    <p class="hint" id="hint">长按设置图标可改 API Key · UI 版本 <span id="ver"></span></p>
+  </footer>
+
+  <dialog id="settings-dialog">
+    <h3>设置</h3>
+    <label>VOLC_API_KEY
+      <input id="api-key-input" type="text" autocomplete="off" placeholder="68c1a2d8-..." />
+    </label>
+    <p class="dim">在火山方舟控制台获取，存储在本机不上传</p>
+    <div class="row">
+      <button id="save-btn">保存</button>
+      <button id="cancel-btn" class="secondary">取消</button>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
