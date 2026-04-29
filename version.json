@@ -1,5 +1,5 @@
 {
-  "ui_version": "0.6.1",
-  "min_apk_version": 9,
-  "release_notes": "v0.6.1 — 方舟双 key 体系（同传/LLM 独立）+ LLM prompt 优化加 few-shot 示例"
+  "ui_version": "0.7.0",
+  "min_apk_version": 10,
+  "release_notes": "v0.7.0 — TTS 音质升级到 24kHz 32-bit float PCM（宽带语音）"
 }
