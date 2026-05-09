@@ -13,6 +13,10 @@
       <button class="mode-btn active" data-mode="translate">同传</button>
       <button class="mode-btn" data-mode="learn">学习</button>
     </div>
+    <button id="review-btn" class="icon-btn review-btn" title="语料本">
+      <span class="review-icon">📚</span>
+      <span id="review-count" class="review-count" hidden>0</span>
+    </button>
     <button id="export-btn" class="icon-btn" title="导出上次日志">📋</button>
     <button id="settings-btn" class="icon-btn" title="设置">⚙</button>
   </header>
@@ -20,6 +24,8 @@
   <div class="status-bar">
     <span id="status" class="status">未连接</span>
   </div>
+
+  <div id="toast" class="toast" hidden></div>
 
   <main>
     <section class="transcript">
@@ -56,5 +62,6 @@
   </dialog>
 
   <script src="app.js"></script>
+<footer>Tono v0.7.0 — Powered by Kanban Agent Matrix</footer>
 </body>
 </html>

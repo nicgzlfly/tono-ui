@@ -44,8 +44,27 @@ header {
   width: 34px; height: 34px; border-radius: 50%;
   background: transparent; border: 1px solid #333; color: var(--fg);
   font-size: 16px; cursor: pointer; flex-shrink: 0;
+  position: relative;
 }
 .icon-btn:active { background: #222; }
+
+/* 语料本入口 + 收藏数徽标 */
+.review-btn { display: inline-flex; align-items: center; justify-content: center; }
+.review-btn .review-icon { line-height: 1; }
+.review-count {
+  position: absolute; top: -4px; right: -4px;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--polished); color: #1a1a1f;
+  font-size: 10px; font-weight: 700; line-height: 18px; text-align: center;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.review-count[hidden] { display: none; }
+.review-btn.bump { animation: badge-bump 0.4s ease-out; }
+@keyframes badge-bump {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
 
 .status-bar {
   padding: 6px 20px;
@@ -55,6 +74,28 @@ header {
 .status { color: var(--dim); }
 .status.on { color: #6ce26c; }
 .status.err { color: var(--accent); }
+
+/* Toast(收藏/清空反馈) */
+.toast {
+  position: fixed; left: 50%; top: 14%;
+  transform: translate(-50%, -8px);
+  padding: 9px 16px; border-radius: 999px;
+  background: rgba(26,26,31,0.96); color: var(--fg);
+  border: 1px solid #2a2a2f;
+  font-size: 13px; line-height: 1.2;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+  z-index: 50;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.toast.ok { border-color: var(--polished); color: var(--polished); }
+.toast.dim { color: var(--dim); }
+.toast[hidden] { display: none; }
 
 main {
   flex: 1; overflow-y: auto;
@@ -71,13 +112,55 @@ main {
   animation: slide-in 0.2s ease-out;
   border-left: 3px solid transparent;
 }
-.utt .src { color: var(--src); margin-bottom: 4px; font-size: 14px; opacity: 0.85; }
+.utt .compare { display: flex; flex-direction: column; gap: 6px; }
+.utt .compare > div { display: flex; flex-direction: column; gap: 2px; }
+.utt .lbl {
+  font-size: 10px; letter-spacing: 0.4px; color: var(--dim);
+  text-transform: none; opacity: 0.85;
+}
+.utt .lbl-src { color: var(--src); }
+.utt .lbl-tgt { color: var(--tgt); }
+.utt .lbl-polished { color: var(--polished); }
+
+.utt .src { color: var(--src); font-size: 14px; opacity: 0.92; }
 .utt .tgt { color: var(--tgt); font-weight: 500; }
-.utt .polished { color: var(--polished); margin-top: 6px; font-size: 15px; }
-.utt .meta { color: var(--dim); font-size: 11px; margin-top: 6px; display: flex; gap: 12px; align-items: center; }
-.utt .fav-btn { background: transparent; border: 1px solid #333; color: var(--dim); border-radius: 6px; padding: 2px 8px; font-size: 12px; cursor: pointer; margin-left: auto; }
-.utt .fav-btn.saved { color: var(--polished); border-color: var(--polished); }
+.utt .polished { color: var(--polished); font-size: 15px; }
+
+.utt .meta { color: var(--dim); font-size: 11px; margin-top: 8px; display: flex; gap: 12px; align-items: center; }
+.utt .fav-btn {
+  background: transparent; border: 1px solid #333; color: var(--dim);
+  border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer;
+  margin-left: auto; transition: color 0.18s, border-color 0.18s, background 0.18s;
+}
+.utt .fav-btn.saving { color: var(--tgt); border-color: var(--tgt); }
+.utt .fav-btn.saved { color: var(--polished); border-color: var(--polished); background: rgba(184,141,255,0.12); }
+.utt .fav-btn.pop { animation: fav-pop 0.42s ease-out; }
+@keyframes fav-pop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.18); }
+  60%  { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
 .utt.partial { opacity: 0.7; }
+.utt.partial .row-tgt,
+.utt.partial .row-polished { display: none; }
+
+/* 学习模式：原话 + 译文 + 润色版 同屏对照(B 版纯文本对照,无差异高亮) */
+body[data-mode="learn"] .utt .compare > div {
+  background: rgba(255,255,255,0.025);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+body[data-mode="learn"] .utt .row-polished {
+  background: rgba(184,141,255,0.08);
+  border-left: 2px solid var(--polished);
+}
+body[data-mode="learn"] .utt .row-src {
+  border-left: 2px solid var(--src);
+}
+body[data-mode="learn"] .utt .row-tgt {
+  border-left: 2px solid var(--tgt);
+}
 
 /* head 标签 (speaker · 语向) */
 .utt .head {

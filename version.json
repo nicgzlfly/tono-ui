@@ -1,5 +1,5 @@
 {
-  "ui_version": "0.7.0",
+  "ui_version": "0.7.1",
   "min_apk_version": 10,
-  "release_notes": "v0.7.0 — TTS 音质升级到 24kHz 32-bit float PCM（宽带语音）"
+  "release_notes": "v0.7.1 — 学习模式 UI 闭环:语料本入口 + 收藏数徽标 + 收藏 toast/动画 + 原话/译文/润色版同屏对照(纯文本 · 无差异高亮)"
 }

@@ -1,10 +1,13 @@
 /**
- * Tono UI v0.4.0 — 同传 + 学习双模式
+ * Tono UI v0.7.1 — 同传 + 学习双模式
  *
  * 原生 → JS:
  *   onSessionStarted / onSessionStopped / onSessionFailed / onError / onApiKeyMissing
  *   onUtterance({ id, src?, tgt?, status, latencyMs?, speaker?: 'ME'|'OTHER'|'UNSURE', lang?: 'zh'|'en' })
  *   onPolished({ id, polished })   ← 学习模式 LLM 异步返回
+ *   onLlmFailed({ id, reason, http_code, retried? })
+ *   onFavoriteSaved({ ts, dedup, count })   ← v0.7 新增(契约见 changelog-learning §3)
+ *   onFavoritesCleared()                    ← v0.7 新增
  *   onVadState({ state })
  *
  * JS → 原生:
@@ -15,12 +18,25 @@
  *   setProductMode / getProductMode
  *   getTranslateMyVoice / setTranslateMyVoice
  *   saveFavorite(json)
+ *   getFavoritesCount(): number          ← v0.7 新增
+ *   listFavorites(): string (JSON array) ← v0.7 新增
+ *   removeFavorite(ts: number): boolean  ← v0.7 新增
+ *   clearFavorites()                     ← v0.7 新增
+ *   retryPolish(uid, sourceText)         ← v0.7 新增
+ *   getLlmStats(): string                ← v0.7 新增
  */
 
-const VERSION = '0.7.0';
+const VERSION = '0.7.1';
 document.getElementById('ver').textContent = VERSION;
 
 // -------- bridge wrapper（含 mock）--------
+function mockFavoritesArray() {
+  try { return JSON.parse(localStorage.getItem('mock_favs') || '[]'); }
+  catch { return []; }
+}
+function mockFavoritesWrite(arr) {
+  localStorage.setItem('mock_favs', JSON.stringify(arr));
+}
 const bridge = window.tono || (() => ({
   startSession() { console.log('[mock] startSession'); setTimeout(() => window.onSessionStarted?.(), 200); },
   stopSession() { setTimeout(() => window.onSessionStopped?.(), 100); },
@@ -34,7 +50,27 @@ const bridge = window.tono || (() => ({
   getSegmentMode() { return localStorage.getItem('mock_seg') || 'NATURAL'; },
   setProductMode(m) { localStorage.setItem('mock_pmode', m); },
   getProductMode() { return localStorage.getItem('mock_pmode') || 'translate'; },
-  saveFavorite(j) { console.log('[mock] saveFavorite', j); },
+  saveFavorite(j) {
+    const item = JSON.parse(j);
+    const arr = mockFavoritesArray();
+    const ts = Date.now();
+    const dup = arr.some(x => x.src === item.src && (x.polished || '') === (item.polished || ''));
+    if (!dup) { arr.push({ ...item, ts }); mockFavoritesWrite(arr); }
+    setTimeout(() => window.onFavoriteSaved?.({ ts, dedup: dup, count: arr.length }), 60);
+  },
+  // v0.7 学习闭环新增（与 changelog-learning §3 对齐）
+  getFavoritesCount() { return mockFavoritesArray().length; },
+  listFavorites() { return JSON.stringify(mockFavoritesArray()); },
+  removeFavorite(ts) {
+    const arr = mockFavoritesArray();
+    const before = arr.length;
+    const next = arr.filter(x => x.ts !== ts);
+    mockFavoritesWrite(next);
+    return next.length !== before;
+  },
+  clearFavorites() { mockFavoritesWrite([]); setTimeout(() => window.onFavoritesCleared?.(), 30); },
+  retryPolish(uid, _src) { console.log('[mock] retryPolish', uid); },
+  getLlmStats() { return JSON.stringify({ calls: 0, cache_hits: 0, failures: 0, identical_returns: 0 }); },
 }))();
 
 // -------- state --------
@@ -52,6 +88,36 @@ const $vadState = document.getElementById('vad-state');
 const $settings = document.getElementById('settings-btn');
 const $dialog = document.getElementById('settings-dialog');
 const $apiKey = document.getElementById('api-key-input');
+const $review = document.getElementById('review-btn');
+const $reviewCount = document.getElementById('review-count');
+const $toast = document.getElementById('toast');
+
+// -------- toast / 收藏徽标 --------
+let _toastTimer = null;
+function showToast(msg, kind) {
+  if (!$toast) return;
+  $toast.textContent = msg;
+  $toast.className = 'toast' + (kind ? ' ' + kind : '');
+  $toast.hidden = false;
+  // 触发重绘以重启动画
+  void $toast.offsetWidth;
+  $toast.classList.add('show');
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => {
+    $toast.classList.remove('show');
+    setTimeout(() => { $toast.hidden = true; }, 220);
+  }, 1800);
+}
+function refreshFavCount() {
+  const n = (typeof bridge.getFavoritesCount === 'function') ? bridge.getFavoritesCount() : 0;
+  if (!$reviewCount) return;
+  if (n > 0) {
+    $reviewCount.textContent = n > 99 ? '99+' : String(n);
+    $reviewCount.hidden = false;
+  } else {
+    $reviewCount.hidden = true;
+  }
+}
 
 function setStatus(text, cls) {
   $status.textContent = text;
@@ -122,12 +188,15 @@ window.onUtterance = (u) => {
     node = document.createElement('div');
     node.className = 'utt partial';
     node.dataset.id = u.id;
+    // 学习模式同屏对照:🎤 你说的(原话) + ✨ 译文 + 🎯 地道版本(润色),纯文本对照(B 版无差异高亮)
     node.innerHTML = `
       <div class="head"></div>
-      <div class="src"></div>
-      <div class="tgt"></div>
-      <div class="polished" style="display:none"></div>
-      <div class="llm-status" style="display:none"></div>
+      <div class="compare">
+        <div class="row-src"><span class="lbl lbl-src">🎤 你说的</span><div class="src"></div></div>
+        <div class="row-tgt"><span class="lbl lbl-tgt">✨ 译文</span><div class="tgt"></div></div>
+        <div class="row-polished" hidden><span class="lbl lbl-polished">🎯 地道版本</span><div class="polished"></div></div>
+      </div>
+      <div class="llm-status" hidden></div>
       <div class="meta"></div>
     `;
     if ($utts.firstChild) $utts.insertBefore(node, $utts.firstChild);
@@ -176,28 +245,69 @@ window.onUtterance = (u) => {
       btn.textContent = '💾 收藏';
       btn.addEventListener('click', (ev) => {
         ev.stopPropagation();
+        if (btn.dataset.busy === '1' || btn.classList.contains('saved')) return;
+        const polishedText = node.querySelector('.polished').textContent.replace(/^🎯\s*/, '');
         const item = {
           src: node.querySelector('.src').textContent,
           tgt: node.querySelector('.tgt').textContent,
-          polished: node.querySelector('.polished').textContent || '',
+          polished: polishedText,
           speaker: u.speaker, lang: u.lang,
         };
+        // 把 fav-btn 标记为 pending，等 onFavoriteSaved 回调再做最终视觉反馈（AC-L8）
+        btn.dataset.busy = '1';
+        btn.classList.add('saving');
+        btn.textContent = '⏳ 收藏中…';
+        state.pendingFav = btn;
         bridge.saveFavorite?.(JSON.stringify(item));
-        btn.classList.add('saved');
-        btn.textContent = '✓ 已收藏';
       });
       meta.appendChild(btn);
     }
   }
 };
 
-// v0.6.0：LLM 失败诊断
+// v0.7：收藏入库回执（AC-L4 + AC-L8）
+window.onFavoriteSaved = (e) => {
+  const btn = state.pendingFav;
+  if (btn) {
+    btn.classList.remove('saving');
+    btn.dataset.busy = '';
+    btn.classList.add('saved', 'pop');
+    btn.textContent = e?.dedup ? '✓ 已在语料本' : '✓ 已收藏';
+    setTimeout(() => btn.classList.remove('pop'), 420);
+    state.pendingFav = null;
+  }
+  // 全局徽标 + toast
+  if (typeof e?.count === 'number') {
+    if ($reviewCount) {
+      $reviewCount.textContent = e.count > 99 ? '99+' : String(e.count);
+      $reviewCount.hidden = e.count <= 0;
+      $review?.classList.add('bump');
+      setTimeout(() => $review?.classList.remove('bump'), 420);
+    }
+  } else {
+    refreshFavCount();
+  }
+  showToast(e?.dedup ? '📚 这句已在语料本里' : `📚 已收藏 · 共 ${e?.count ?? '?'} 条`, e?.dedup ? 'dim' : 'ok');
+};
+
+// v0.7：语料本被清空后回写徽标
+window.onFavoritesCleared = () => {
+  refreshFavCount();
+  showToast('🗑 语料本已清空', 'dim');
+};
+
+// v0.6.0：LLM 失败诊断（AC-L3 优雅降级 — 原话仍在,只追加状态行)
 window.onLlmFailed = (e) => {
   const node = state.utterances.get(e?.id);
   if (!node) return;
   const status = node.querySelector('.llm-status');
-  status.textContent = `🚫 LLM 失败：${e.reason || '未知'} ${e.http_code > 0 ? '(HTTP '+e.http_code+')' : ''}`;
-  status.style.display = 'block';
+  const httpPart = (e?.http_code && e.http_code > 0) ? ` (HTTP ${e.http_code})` : '';
+  const retried = e?.retried ? ' · 已重试' : '';
+  status.textContent = `🚫 润色失败:${e?.reason || '未知'}${httpPart}${retried}`;
+  status.hidden = false;
+  // 失败时不展开润色行,但保留原话/译文的对照
+  const row = node.querySelector('.row-polished');
+  if (row) row.hidden = true;
 };
 
 // v0.6.0：通话模式外放给对方提示
@@ -208,12 +318,17 @@ window.onOpponentSpeakerEnd = (e) => {
   setStatus(`✓ 外放完成 (${e?.total_ms||0}ms)，可重新戴耳机`, 'on');
 };
 
+// v0.7：润色版同屏显示(纯文本对照,B 版禁差异高亮 — 见 b-version-scope §3)
 window.onPolished = (e) => {
   const node = state.utterances.get(e?.id);
   if (!node || !e?.polished) return;
   const p = node.querySelector('.polished');
-  p.textContent = '🎯 ' + e.polished;
-  p.style.display = 'block';
+  p.textContent = e.polished;
+  const row = node.querySelector('.row-polished');
+  if (row) row.hidden = false;
+  // 出现润色版时清除可能残留的 LLM 失败提示
+  const status = node.querySelector('.llm-status');
+  if (status) status.hidden = true;
 };
 
 // -------- 录音按钮（持续模式：点击切换）--------
@@ -256,11 +371,18 @@ document.querySelectorAll('.pill').forEach(p => p.addEventListener('click', () =
 const currentSeg = bridge.getSegmentMode?.() || 'NATURAL';
 document.querySelectorAll('.pill').forEach(x => x.classList.toggle('active', x.dataset.segmode === currentSeg));
 
-// -------- 设置 / 导出 --------
+// -------- 设置 / 导出 / 语料本入口 --------
 $settings.addEventListener('click', () => bridge.openSettings ? bridge.openSettings() : showSettings());
 document.getElementById('export-btn').addEventListener('click', () => {
   if (bridge.exportLastSession) bridge.exportLastSession();
   else setStatus('mock 模式无日志', 'err');
+});
+
+// 📚 语料本入口 — 点击进入原生 ReviewActivity(AC-L5)
+$review?.addEventListener('click', () => {
+  // 消费 listFavorites:进入前先确保徽标数与底层一致(避免冷启动错位)
+  refreshFavCount();
+  if (bridge.openReview) bridge.openReview();
 });
 
 function showSettings() {
@@ -281,3 +403,6 @@ if (!bridge.getApiKey || !bridge.getApiKey()) {
   else showSettings();
 }
 setStatus('就绪');
+
+// 启动时同步收藏总数徽标(消费 listFavorites/getFavoritesCount)
+refreshFavCount();
